@@ -1,3 +1,4 @@
+import { mutableHandlers } from './baseHandlers'
 import { track, trigger } from './effect'
 import { isObject } from './utils'
 //定义枚举
@@ -31,27 +32,9 @@ export function reactive(target: object) {
   if (target[ReactiveFlags.IS_REACTIVE]) {
     return target
   }
-  const proxy = new Proxy(target, {
-    get(target, key, receiver) {
-      if (key === ReactiveFlags.IS_REACTIVE) {
-        return true
-      }
-      //todo: 依赖收集
-      track(target, key)
-      //返回对象的相应属性值
-      const result = Reflect.get(target, key, receiver)
-      return result
-    },
-    set(target, key, value, receiver) {
-      //todo:触发更新
-      trigger(target, key)
-      //设置对象的相应属性值
-      const result = Reflect.set(target, key, value, receiver)
-      //返回设置结果
-      return result
-    }
-  });
+  const proxy = new Proxy(target, mutableHandlers);
   //将代理对象存入WeakMap中
   targetMap.set(target, proxy)
+  
   return proxy
 }
