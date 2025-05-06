@@ -1,8 +1,9 @@
-export function track(target: object, key: unknown) {
-console.log(`依赖收集：${key}属性被访问了`);
+import { TrackOpTypes,TriggerOpTypes } from "./operation";
+export function track(target: object,type:TrackOpTypes, key: unknown) {
+console.log(`%c依赖收集；【${type}】${String(key)}`, 'color:#f40');
 }
 
-export function trigger(target: object, key: unknown) {
+export function trigger(target: object, type: TriggerOpTypes, key: unknown) {
 
-console.log(`触发更新：${key}属性被修改了`);
+  console.log(`%c触发更新；【${type}】${String(key)}`, 'color:#0f0');
 }
