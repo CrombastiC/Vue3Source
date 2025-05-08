@@ -13,7 +13,7 @@ const arrayInstrumentations: Record<string, Function> = {};
   //先获取原生方法的引用
   const method = Array.prototype[key] as any
   arrayInstrumentations[key] = function (this: unknown[], ...args: unknown[]) {
-   //将this转化为非响应式(代理)对象
+    //将this转化为非响应式(代理)对象
     const arr = toRaw(this)
     //遍历当前数组的每个索引，通过track函数对数组索引进行依赖收集
     for (let i = 0, l = this.length; i < l; i++) {
@@ -21,10 +21,10 @@ const arrayInstrumentations: Record<string, Function> = {};
     }
     //直接在原始对象中查找，使用原始数组和参数
     const res = method.apply(arr, args)
-    if(res === -1 || res === false) {
+    if (res === -1 || res === false) {
       //如果没有找到，注意，还需要进行处理，因为参数也有可能是响应式的
-      return method.apply(arr,args.map(toRaw))
-    }else{
+      return method.apply(arr, args.map(toRaw))
+    } else {
       return res
     }
   }
@@ -48,20 +48,44 @@ function get(target: object, key: string | symbol, receiver: object): any {
 
 function set(target: Record<string | symbol, unknown>, key: string | symbol, value: unknown, receiver: object): boolean {
   //判断对象是否有这个属性
-  const hasKey = target.hasOwnProperty(key)
+  // const hasKey = target.hasOwnProperty(key)
+  const type = target.hasOwnProperty(key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
   let oldValue = target[key]
-  if (!hasKey) {
-    //如果没有这个属性，说明是新增的属性
+  const oldLen = Array.isArray(target) ? target.length : 0
+  // if (!hasKey) {
+  //   //如果没有这个属性，说明是新增的属性
 
-    trigger(target, TriggerOpTypes.ADD, key)
-  } else if (hasChanged(value, oldValue)) {
-    //如果有这个属性，说明是修改的属性
-    //如果值发生了变化，说明是修改的属性
-    trigger(target, TriggerOpTypes.SET, key)
-  }
+  //   trigger(target, TriggerOpTypes.ADD, key)
+  // } else if (hasChanged(value, oldValue)) {
+  //   //如果有这个属性，说明是修改的属性
+  //   //如果值发生了变化，说明是修改的属性
+  //   trigger(target, TriggerOpTypes.SET, key)
+  // }
 
   //设置对象的相应属性值
   const result = Reflect.set(target, key, value, receiver)
+
+  if (!result) {
+    return result
+  }
+
+  const newLen = Array.isArray(target) ? target.length : 0
+
+  if (hasChanged(value, oldValue) || type === TriggerOpTypes.ADD) {
+    trigger(target, type, key)
+    if (Array.isArray(target) && oldLen !== newLen) {
+      //如果是数组，并且长度发生了变化，说明是新增的属性
+      if (key !== 'length') {
+        trigger(target, TriggerOpTypes.ADD, 'length')
+      }else{
+        //当操作的key是length时，说明是删除了数组的元素。所以新的长度小于旧的长度
+        for (let i = newLen; i < oldLen; i++) {
+          //遍历旧的数组，触发删除操作
+          trigger(target, TriggerOpTypes.DELETE, i)
+        }
+      }
+    }
+  }
   //返回设置结果
   return result
 }
