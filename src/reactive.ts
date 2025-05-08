@@ -1,4 +1,4 @@
-import { mutableHandlers } from './baseHandlers'
+import { mutableHandlers, readonlyHandlers } from './baseHandlers'
 import { isObject } from './utils'
 //定义枚举
 export const enum ReactiveFlags {
@@ -14,32 +14,71 @@ export interface Target {
   [ReactiveFlags.RAW]?: any
   [ReactiveFlags.SKIP]?: boolean
 }
-//定义依赖树
-export const targetMap = new WeakMap<Target, any>()
+//为了区分普通代理和只读代理分开存储
+export const reactiveMap = new WeakMap<Target, any>()
+export const readonlyMap = new WeakMap<Target, any>()
 
-export function reactive<T extends object>(target: T): T;
-export function reactive(target: object) {
+function createReactiveObject(
+  target: Target,
+  isReadonly: boolean,
+  baseHandlers: ProxyHandler<any>,
+) {
   //如果不是对象，就直接返回
   if (!isObject(target)) {
     console.error('Target is not an object');
     return target
   }
   //如果是已经代理过的对象，就不需要再次代理
-  if (targetMap.has(target)) {
-    return targetMap.get(target)//返回代理对象
+  const proxyMap = isReadonly ? readonlyMap : reactiveMap
+  const existingProxy = proxyMap.get(target)
+  if (existingProxy) {
+    return existingProxy
   }
-  //如果读到了target[ReactiveFlags.IS_REACTIVE]，就返回target
+  //只有读到了target[ReactiveFlags.IS_REACTIVE]，才会返回target
   if (target[ReactiveFlags.RAW] && target[ReactiveFlags.IS_REACTIVE]) {
     return target
   }
-  const proxy = new Proxy(target, mutableHandlers);
-  //将代理对象存入WeakMap中
-  targetMap.set(target, proxy)
+  const proxy = new Proxy(target, baseHandlers)
+
+  proxyMap.set(target, proxy)
 
   return proxy
 }
 
+//定义依赖树
+export const targetMap = new WeakMap<Target, any>()
+
+export function reactive<T extends object>(target: T): T;
+export function reactive(target: object) {
+
+  if (target && (target as Target)[ReactiveFlags.IS_READONLY]) {
+
+    return target
+  }
+
+  return createReactiveObject(target, false, mutableHandlers)
+}
+/**
+ *  类型体操比较实用的一个小技巧，通过下面的代码可以看到深层计算之后的结果
+ *  T extends any ?
+ *  {
+ *  具体类型体操的代码
+ *  }
+ *  :never
+ */
+type DeepReadonly<T extends Record<string, any>> = T extends any ? {
+  readonly [K in keyof T]: T[K] extends Record<string, any> ? DeepReadonly<T[K]> : T[K]
+} : never
+export function readonly<T extends object>(target: T): DeepReadonly<T> {
+  return createReactiveObject(
+    target,
+    true,
+    readonlyHandlers//readonlyHandlers处理3程序需要单独处理
+  )
+}
+
+
 export function toRaw<T>(observed: T): T {
   return (observed as Target)[ReactiveFlags.RAW] || observed
-  
+
 }

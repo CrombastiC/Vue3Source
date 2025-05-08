@@ -1,6 +1,6 @@
 import { enableTracking, pauseTracking, track, trigger } from './effect'
 import { hasChanged, isArray, isObject } from './utils'
-import { ReactiveFlags, reactive, toRaw, targetMap } from './reactive'
+import { ReactiveFlags, reactive, toRaw, targetMap, readonlyMap, reactiveMap, readonly } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operation'
 //用来表示对对象的"迭代依赖的标识"
 export const ITERATE_KEY = Symbol('')
@@ -39,34 +39,77 @@ const arrayInstrumentations: Record<string, Function> = {};
       return res
     }
   })
+function createGetter(isReadonly = false, shallow = false) {
+  return function get(target: object, key: string | symbol, receiver: object): any {
+    //如果访问的是IS_REACTIVE属性， 返回true
+    if (key === ReactiveFlags.IS_REACTIVE) {
+      return true
+    }
+    //如果访问的是IS_READONLY属性， 返回true
+    if (key === ReactiveFlags.IS_READONLY) {
+      return isReadonly
+    } else if (key === ReactiveFlags.RAW && // 当代理对象访问__v_raw属性时，返回原始对象
+      receiver === (isReadonly ? readonlyMap : reactiveMap).get(target) // 确保请求原始对象的访问是代理对象发起的
+    ) {
+      //如果访问的是RAW属性，返回原始对象
+      return target
+    }
 
-function get(target: object, key: string | symbol, receiver: object): any {
-  if (key === ReactiveFlags.IS_REACTIVE) {
-    return true
-  } else if (
-    key === ReactiveFlags.RAW // 当代理对象访问__v_raw属性时，返回原始对象
-    && receiver === targetMap.get(target) // 确保请求原始对象的访问是代理对象发起的
-  ) {
-    return target;
+    //如果是数组，使用arrayInstrumentations中的方法
+    const targetIsArray = isArray(target)
+    if (targetIsArray && arrayInstrumentations.hasOwnProperty(key)) {
+      return Reflect.get(arrayInstrumentations, key, receiver);
+    }
+    //todo: 依赖收集
+    //只有在非只读的情况下才会收集依赖
+    if (!isReadonly) {
+      //依赖收集
+      track(target, TrackOpTypes.GET, key)
+    }
+
+    //返回对象的相应属性值
+    const result = Reflect.get(target, key, receiver);
+
+    //如果是对象，再次进行递归代理
+    if (isObject(result)) {
+      return isReadonly ? readonly(result) : reactive(result);
+    }
+
+    return result;
   }
-
-  const targetIsArray = isArray(target)
-  if (targetIsArray && arrayInstrumentations.hasOwnProperty(key)) {
-    return Reflect.get(arrayInstrumentations, key, receiver);
-  }
-
-  //todo:依赖收集
-  track(target, TrackOpTypes.GET, key)
-  //返回对象的相应属性值
-  const result = Reflect.get(target, key, receiver)
-
-  //如果是对象，再次进行递归处理，用于处理嵌套对象
-  if (isObject(result)) {
-    return reactive(result)
-  }
-  return result
 }
+const get = createGetter()
+const readonlyGet = createGetter(true);
+// function get(target: object, key: string | symbol, receiver: object): any { 
+//   if (key === ReactiveFlags.IS_REACTIVE) {
+//     return true;
+//   }
+//   else if (
+//     key === ReactiveFlags.RAW // 当代理对象访问__v_raw属性时，返回原始对象
+//     && receiver === targetMap.get(target) // 确保请求原始对象的访问是代理对象发起的
+//   ) { 
+//     return target;
+//   }
 
+
+//   const targetIsArray = isArray(target);
+//   if (targetIsArray && arrayInstrumentations.hasOwnProperty(key)) { 
+//     return Reflect.get(arrayInstrumentations, key, receiver);
+//   }
+
+
+//   // todo: 收集依赖
+//   track(target, TrackOpTypes.GET, key);
+//   // 返回对象的相应属性值
+//   const result = Reflect.get(target, key, receiver);
+
+//   // 如果是对象，再次进行递归代理
+//   if (isObject(result)) { 
+//     return reactive(result);
+//   }
+
+//   return result;
+// }
 function set(target: Record<string | symbol, unknown>, key: string | symbol, value: unknown, receiver: object): boolean {
   //判断对象是否有这个属性
   // const hasKey = target.hasOwnProperty(key)
@@ -149,4 +192,17 @@ export const mutableHandlers: ProxyHandler<object> = {
   has,
   ownKeys,
   deleteProperty
+}
+
+export const readonlyHandlers: ProxyHandler<object> = {
+  get: readonlyGet,
+  set(target, key) {
+    console.warn(`属性${String(key)}是只读的，不能修改`, target)
+    return true
+  },
+  deleteProperty(target, key) {
+    console.warn(`属性${String(key)}是只读的，不能删除`, target)
+    return true
+  }
+ 
 }
