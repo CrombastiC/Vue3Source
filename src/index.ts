@@ -106,11 +106,65 @@
 // // @ts-ignore 删除对象中可选的属性
 // delete state1.f 
 
-import { reactive } from './reactive'
-const arr = [ 3, 4, 5]
-const state = reactive(arr)
-function fn(){
-  state.indexOf(2)
+// import { reactive } from './reactive'
+// const arr = [ 3, 4, 5]
+// const state = reactive(arr)
+// function fn(){
+//   state.indexOf(2)
+// }
+// fn()
+// // console.log(state.indexOf(2)) // 1;
+
+// / const obj = { a: 1, b: 2 };
+// const arr1 = [3, obj, 5];
+// const state1 = reactive(arr1);
+
+// function fn() { 
+//   const index = state1.lastIndexOf(obj);
+
+//   console.log(arr1, obj);
+//   console.log(state1[1], obj);
+//   console.log(index);
+// }
+// fn();
+
+// import { reactive } from "./reactive";
+
+// 数组长度隐式更新的问题
+// const arr1 = [1, 2, , 4, 5, 6];
+// const state1 = reactive(arr1);
+
+// function fn() { 
+//   state1[0] = 99;
+//   state1[2] = 100;
+//   // 这里会触发数组长度length的隐式更新，所以我们自己的框架需要触发相关set更新
+//   state1[10] = 77;
+// }
+
+// fn();
+
+// 数组长度显式更新的问题
+// const arr1 = [1, 2, 3, 4, 5, 6];
+// const state1 = reactive(arr1);
+
+// function fn() { 
+//   // 如果数组长度的设置小于原来数组的长度，其实应该是两件事情
+//   // oldLen 6
+//   // newLen 3
+
+//   // set length 3
+//   // delete 3, 
+//   // delete 4, 
+//   // delete 5
+//   state1.length = 3;
+// }
+
+// fn();
+
+import { reactive } from "./reactive";
+const arr1 = [1, 2, 3, 4, 5, 6];
+const state1 = reactive(arr1);
+function fn() {
+  state1.push(7);
 }
-fn()
-// console.log(state.indexOf(2)) // 1;
+fn();

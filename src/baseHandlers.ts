@@ -1,6 +1,6 @@
-import { track, trigger } from './effect'
-import { hasChanged, isObject } from './utils'
-import { ReactiveFlags, reactive, toRaw } from './reactive'
+import { enableTracking, pauseTracking, track, trigger } from './effect'
+import { hasChanged, isArray, isObject } from './utils'
+import { ReactiveFlags, reactive, toRaw, targetMap } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operation'
 //用来表示对对象的"迭代依赖的标识"
 export const ITERATE_KEY = Symbol('')
@@ -30,10 +30,31 @@ const arrayInstrumentations: Record<string, Function> = {};
   }
 })
 
+  ; (['push', 'pop', 'shift', 'unshift', 'splice'] as const).forEach(key => {
+    const method = Array.prototype[key] as any
+    arrayInstrumentations[key] = function (this: unknown[], ...args: unknown[]) {
+      pauseTracking()
+      const res = method.apply(this, args)
+      enableTracking()
+      return res
+    }
+  })
+
 function get(target: object, key: string | symbol, receiver: object): any {
   if (key === ReactiveFlags.IS_REACTIVE) {
     return true
+  } else if (
+    key === ReactiveFlags.RAW // 当代理对象访问__v_raw属性时，返回原始对象
+    && receiver === targetMap.get(target) // 确保请求原始对象的访问是代理对象发起的
+  ) {
+    return target;
   }
+
+  const targetIsArray = isArray(target)
+  if (targetIsArray && arrayInstrumentations.hasOwnProperty(key)) {
+    return Reflect.get(arrayInstrumentations, key, receiver);
+  }
+
   //todo:依赖收集
   track(target, TrackOpTypes.GET, key)
   //返回对象的相应属性值
@@ -77,7 +98,7 @@ function set(target: Record<string | symbol, unknown>, key: string | symbol, val
       //如果是数组，并且长度发生了变化，说明是新增的属性
       if (key !== 'length') {
         trigger(target, TriggerOpTypes.ADD, 'length')
-      }else{
+      } else {
         //当操作的key是length时，说明是删除了数组的元素。所以新的长度小于旧的长度
         for (let i = newLen; i < oldLen; i++) {
           //遍历旧的数组，触发删除操作
