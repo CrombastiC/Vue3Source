@@ -1,5 +1,4 @@
 import { mutableHandlers } from './baseHandlers'
-import { track, trigger } from './effect'
 import { isObject } from './utils'
 //定义枚举
 export const enum ReactiveFlags {
@@ -20,21 +19,27 @@ export const targetMap = new WeakMap<Target, any>()
 
 export function reactive<T extends object>(target: T): T;
 export function reactive(target: object) {
-  //判断是否是对象
+  //如果不是对象，就直接返回
   if (!isObject(target)) {
+    console.error('Target is not an object');
     return target
   }
   //如果是已经代理过的对象，就不需要再次代理
   if (targetMap.has(target)) {
     return targetMap.get(target)//返回代理对象
   }
-  //判断是否是响应式对象
-  if (target[ReactiveFlags.IS_REACTIVE]) {
+  //如果读到了target[ReactiveFlags.IS_REACTIVE]，就返回target
+  if (target[ReactiveFlags.RAW] && target[ReactiveFlags.IS_REACTIVE]) {
     return target
   }
   const proxy = new Proxy(target, mutableHandlers);
   //将代理对象存入WeakMap中
   targetMap.set(target, proxy)
-  
+
   return proxy
+}
+
+export function toRaw<T>(observed: T): T {
+  return (observed as Target)[ReactiveFlags.RAW] || observed
+  
 }

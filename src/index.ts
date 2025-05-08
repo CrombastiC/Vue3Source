@@ -84,24 +84,33 @@
 // fn();
 
 //测试记录收集和派发更新
+// import { reactive } from './reactive'
+// const obj = {
+//   a: 1,
+//   b: 2,
+//   c: {
+//     d: 3
+//   }
+// };
+// const state1 = reactive(obj);
+// function fn() {
+//   //Object.keys(state1) // ['a', 'b', 'c']
+// Object.keys(state1)
+// }
+// fn()
+// state1.a = 2
+// //@ts-ignore 这里因为只能对存在的属性进行赋值，所以会报错
+// state1.e = 3
+// // @ts-ignore 删除只能删除对象中可选的属性
+// delete state1.a
+// // @ts-ignore 删除对象中可选的属性
+// delete state1.f 
+
 import { reactive } from './reactive'
-const obj = {
-  a: 1,
-  b: 2,
-  c: {
-    d: 3
-  }
-};
-const state1 = reactive(obj);
-function fn() {
-  //Object.keys(state1) // ['a', 'b', 'c']
-Object.keys(state1)
+const arr = [ 3, 4, 5]
+const state = reactive(arr)
+function fn(){
+  state.indexOf(2)
 }
 fn()
-state1.a = 2
-//@ts-ignore 这里因为只能对存在的属性进行赋值，所以会报错
-state1.e = 3
-// @ts-ignore 删除只能删除对象中可选的属性
-delete state1.a
-// @ts-ignore 删除对象中可选的属性
-delete state1.f 
+// console.log(state.indexOf(2)) // 1;
