@@ -193,38 +193,63 @@
 // console.log(readonlyObj.c.d) // 3;
 
 //一些对象标准行为(特殊情况)需要进行排除
-import { reactive } from "./reactive";
-const obj = {
+// import { reactive } from "./reactive";
+// const obj = {
+//   a: 1,
+//   b: 2,
+//   c: {
+//     d: 3
+//   },
+//   [Symbol.toStringTag]: 'myObject',
+//   items: [1, 2, 3],
+//   [Symbol.iterator]: function () {
+//     let index = 0
+//     const items = this.items
+//     return {
+//       next: function () {
+//         return index < items.length
+//           ? { value: items[index++], done: false }
+//           : { value: undefined, done: true }
+//       }
+//     }
+//   }
+// };
+
+// console.log(obj.toString()); // [object myObject]
+
+// for (const item of obj) {
+//   console.log(item);
+// }
+
+// const state =reactive(obj)
+// console.log((state as any).__proto__);
+// console.log(state.toString());
+
+// for (const item of state) {
+//   console.log(item);
+// }
+
+import { reactive, shallowReactive } from "./reactive";
+const obj1 = {
   a: 1,
   b: 2,
   c: {
     d: 3
-  },
-  [Symbol.toStringTag]: 'myObject',
-  items: [1, 2, 3],
-  [Symbol.iterator]: function () {
-    let index = 0
-    const items = this.items
-    return {
-      next: function () {
-        return index < items.length
-          ? { value: items[index++], done: false }
-          : { value: undefined, done: true }
-      }
-    }
   }
-};
-
-console.log(obj.toString()); // [object myObject]
-
-for (const item of obj) {
-  console.log(item);
 }
 
-const state =reactive(obj)
-console.log((state as any).__proto__);
-console.log(state.toString());
-
-for (const item of state) {
-  console.log(item);
+const obj2 = {
+  a: 1,
+  b: 2,
+  c: {
+    d: 3
+  }
 }
+
+
+const state1 = reactive(obj1);
+console.log(state1.c);
+
+const state2 = shallowReactive(obj2);
+console.log(state2.c); // { d: 4 }
+//这里只触发了浅层的依赖收集，并不会触发更新

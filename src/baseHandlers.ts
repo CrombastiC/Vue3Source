@@ -1,5 +1,5 @@
 import { enableTracking, pauseTracking, track, trigger } from './effect'
-import { hasChanged, isArray, isObject, isSymbol } from './utils'
+import { extend, hasChanged, isArray, isObject, isSymbol } from './utils'
 import { ReactiveFlags, reactive, toRaw, targetMap, readonlyMap, reactiveMap, readonly } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operation'
 //用来表示对对象的"迭代依赖的标识"
@@ -89,7 +89,10 @@ function createGetter(isReadonly = false, shallow = false) {
       //依赖收集
       track(target, TrackOpTypes.GET, key)
     }
-
+    //如果是浅层代理，直接返回
+    if (shallow) {
+      return result
+    }
     //如果是对象，再次进行区分只读并递归代理
     if (isObject(result)) {
       return isReadonly ? readonly(result) : reactive(result);
@@ -100,6 +103,11 @@ function createGetter(isReadonly = false, shallow = false) {
 }
 const get = createGetter()
 const readonlyGet = createGetter(true);
+const shallowGet = createGetter(false, true)
+const set = createSetter()
+const shallowSet = createSetter(true)
+
+
 // function get(target: object, key: string | symbol, receiver: object): any { 
 //   if (key === ReactiveFlags.IS_REACTIVE) {
 //     return true;
@@ -130,48 +138,106 @@ const readonlyGet = createGetter(true);
 
 //   return result;
 // }
-function set(target: Record<string | symbol, unknown>, key: string | symbol, value: unknown, receiver: object): boolean {
-  //判断对象是否有这个属性
-  // const hasKey = target.hasOwnProperty(key)
-  const type = target.hasOwnProperty(key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
-  let oldValue = target[key]
-  const oldLen = Array.isArray(target) ? target.length : 0
-  // if (!hasKey) {
-  //   //如果没有这个属性，说明是新增的属性
 
-  //   trigger(target, TriggerOpTypes.ADD, key)
-  // } else if (hasChanged(value, oldValue)) {
-  //   //如果有这个属性，说明是修改的属性
-  //   //如果值发生了变化，说明是修改的属性
-  //   trigger(target, TriggerOpTypes.SET, key)
-  // }
+// function set(target: Record<string | symbol, unknown>, key: string | symbol, value: unknown, receiver: object): boolean { 
+//   // todo: 触发更新
+//   // 判断动作是ADD还是SET，而且SET操作应该是值不一样的情况下再进行处理
+//   const hadKey = target.hasOwnProperty(key);
 
-  //设置对象的相应属性值
-  const result = Reflect.set(target, key, value, receiver)
+//   const type = target.hasOwnProperty(key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD;
 
-  if (!result) {
-    return result
-  }
 
-  const newLen = Array.isArray(target) ? target.length : 0
+//   // ts注意object类型，target[key]如果直接这么写，ts会报错，元素有隐式的any类型
+//   // 这里可以直接将target修改为Record<string | symbol, unknown>
+//   let oldValue = target[key];
 
-  if (hasChanged(value, oldValue) || type === TriggerOpTypes.ADD) {
-    trigger(target, type, key)
-    if (Array.isArray(target) && oldLen !== newLen) {
-      //如果是数组，并且长度发生了变化，说明是新增的属性
-      if (key !== 'length') {
-        trigger(target, TriggerOpTypes.ADD, 'length')
-      } else {
-        //当操作的key是length时，说明是删除了数组的元素。所以新的长度小于旧的长度
-        for (let i = newLen; i < oldLen; i++) {
-          //遍历旧的数组，触发删除操作
-          trigger(target, TriggerOpTypes.DELETE, i)
+//   // 如果是数组获取长度,首先获取的是修改之前的长度
+//   const oldLen = isArray(target) ? target.length : 0;
+
+//   // if (!hadKey) {
+//   //   trigger(target, TriggerOpTypes.ADD, key);
+//   // }
+//   // else if(hasChanged(value, oldValue)) { 
+//   //   trigger(target, TriggerOpTypes.SET, key);
+//   // }
+  
+//   // 设置对象的相应属性值
+//   const result = Reflect.set(target, key, value, receiver);
+//   if (!result) { 
+//     return result;
+//   }
+
+//   // 修改之后的长度
+//   const newLen = isArray(target) ? target.length : 0;
+
+//   if (hasChanged(value, oldValue) || type === TriggerOpTypes.ADD) { 
+//     trigger(target, type, key);
+//     if (isArray(target) && oldLen !== newLen) { 
+//       if (key !== 'length') { 
+//         trigger(target, TriggerOpTypes.SET, 'length');
+//       }
+//       else {
+//         for(let i=newLen; i<oldLen; i++) { 
+//           trigger(target, TriggerOpTypes.DELETE, i + '');
+//         }
+//       }
+//     }
+//   }
+
+//   return result;
+// }
+function createSetter(shallow = false) {
+  return function set(
+    target: Record<string | symbol, unknown>,
+    key: string | symbol,
+    value: unknown,
+    receiver: object
+  ): boolean {
+    //判断对象是否有这个属性
+    // const hasKey = target.hasOwnProperty(key)
+    const type = target.hasOwnProperty(key)
+      ? TriggerOpTypes.SET
+      : TriggerOpTypes.ADD
+
+    let oldValue = target[key]
+    const oldLen = Array.isArray(target) ? target.length : 0
+    // if (!hasKey) {
+    //   //如果没有这个属性，说明是新增的属性
+
+    //   trigger(target, TriggerOpTypes.ADD, key)
+    // } else if (hasChanged(value, oldValue)) {
+    //   //如果有这个属性，说明是修改的属性
+    //   //如果值发生了变化，说明是修改的属性
+    //   trigger(target, TriggerOpTypes.SET, key)
+    // }
+
+    //设置对象的相应属性值
+    const result = Reflect.set(target, key, value, receiver)
+
+    if (!result) {
+      return result
+    }
+
+    const newLen = Array.isArray(target) ? target.length : 0
+
+    if (hasChanged(value, oldValue) || type === TriggerOpTypes.ADD) {
+      trigger(target, type, key)
+      if (Array.isArray(target) && oldLen !== newLen) {
+        //如果是数组，并且长度发生了变化，说明是新增的属性
+        if (key !== 'length') {
+          trigger(target, TriggerOpTypes.ADD, 'length')
+        } else {
+          //当操作的key是length时，说明是删除了数组的元素。所以新的长度小于旧的长度
+          for (let i = newLen; i < oldLen; i++) {
+            //遍历旧的数组，触发删除操作
+            trigger(target, TriggerOpTypes.DELETE, i)
+          }
         }
       }
     }
+    //返回设置结果
+    return result
   }
-  //返回设置结果
-  return result
 }
 
 //in 关键字在js中触发的是HasProperty正好对应Proxy中的has方法
@@ -226,3 +292,12 @@ export const readonlyHandlers: ProxyHandler<object> = {
   }
 
 }
+
+export const shallowReactiveHandlers: ProxyHandler<object> =extend(
+  {},
+  mutableHandlers,
+  {
+    get: shallowGet,
+    set: shallowSet
+  }
+)

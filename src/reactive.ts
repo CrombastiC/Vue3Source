@@ -1,4 +1,4 @@
-import { mutableHandlers, readonlyHandlers } from './baseHandlers'
+import { mutableHandlers, readonlyHandlers, shallowReactiveHandlers } from './baseHandlers'
 import { isObject } from './utils'
 //定义枚举
 export const enum ReactiveFlags {
@@ -57,6 +57,11 @@ export function reactive(target: object) {
   }
 
   return createReactiveObject(target, false, mutableHandlers)
+}
+
+//浅层代理
+export function shallowReactive<T extends object>(target: T): T {
+  return createReactiveObject(target, false, shallowReactiveHandlers)
 }
 /**
  *  类型体操比较实用的一个小技巧，通过下面的代码可以看到深层计算之后的结果

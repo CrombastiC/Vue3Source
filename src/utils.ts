@@ -30,3 +30,6 @@ export const hasChanged = (value: any, oldValue: any): boolean => {
 export const isSymbol = (val: unknown): val is symbol => {
   return typeof val === 'symbol'
 }
+
+//合并
+export const extend = Object.assign
