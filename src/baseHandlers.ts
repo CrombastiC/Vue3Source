@@ -1,9 +1,16 @@
 import { enableTracking, pauseTracking, track, trigger } from './effect'
-import { hasChanged, isArray, isObject } from './utils'
+import { hasChanged, isArray, isObject, isSymbol } from './utils'
 import { ReactiveFlags, reactive, toRaw, targetMap, readonlyMap, reactiveMap, readonly } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operation'
 //用来表示对对象的"迭代依赖的标识"
 export const ITERATE_KEY = Symbol('')
+
+const builtlinSymbols = new Set(
+  //获取所有的内置方法
+  Object.getOwnPropertyNames(Symbol)
+    .map(key => Symbol[key as any])
+    .filter(isSymbol)
+)
 
 //改动之后的数组方法，通过arrayInstrumentations统一管理
 const arrayInstrumentations: Record<string, Function> = {};
@@ -40,7 +47,11 @@ const arrayInstrumentations: Record<string, Function> = {};
     }
   })
 function createGetter(isReadonly = false, shallow = false) {
-  return function get(target: object, key: string | symbol, receiver: object): any {
+  return function get(
+    target: object,
+    key: string | symbol,
+    receiver: object
+  ): any {
     //如果访问的是IS_REACTIVE属性， 返回true
     if (key === ReactiveFlags.IS_REACTIVE) {
       return true
@@ -60,17 +71,26 @@ function createGetter(isReadonly = false, shallow = false) {
     if (targetIsArray && arrayInstrumentations.hasOwnProperty(key)) {
       return Reflect.get(arrayInstrumentations, key, receiver);
     }
-    //todo: 依赖收集
+
+    //返回对象的相应属性值
+    const result = Reflect.get(target, key, receiver);
+
+    //排除js内置属性的一些特殊情况
+    const keyIsSymbol = isSymbol(key)
+    if (
+      keyIsSymbol
+        ? builtlinSymbols.has(key as symbol)
+        : key === `__proto__`
+    ) {
+      return result
+    }
     //只有在非只读的情况下才会收集依赖
     if (!isReadonly) {
       //依赖收集
       track(target, TrackOpTypes.GET, key)
     }
 
-    //返回对象的相应属性值
-    const result = Reflect.get(target, key, receiver);
-
-    //如果是对象，再次进行递归代理
+    //如果是对象，再次进行区分只读并递归代理
     if (isObject(result)) {
       return isReadonly ? readonly(result) : reactive(result);
     }
@@ -204,5 +224,5 @@ export const readonlyHandlers: ProxyHandler<object> = {
     console.warn(`属性${String(key)}是只读的，不能删除`, target)
     return true
   }
- 
+
 }

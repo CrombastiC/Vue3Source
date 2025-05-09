@@ -25,3 +25,8 @@ export const isPromise = <T = any>(val: unknown): val is Promise<T> => {
 export const hasChanged = (value: any, oldValue: any): boolean => {
   return !Object.is(value, oldValue)
 }
+
+//是否是symbol
+export const isSymbol = (val: unknown): val is symbol => {
+  return typeof val === 'symbol'
+}

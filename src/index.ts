@@ -170,24 +170,61 @@
 // }
 // fn();
 
-import { readonly } from "./reactive";
+// import { readonly } from "./reactive";
 
+// const obj = {
+//   a: 1,
+//   b: 2,
+//   c: {
+//     d: 3
+//   }
+// };
+// const readonlyObj = readonly(obj);
+// //readonly应该触发依赖收集
+
+// //对象的直接属性不能修改
+// // @ts-ignore
+// readonlyObj.a = 2
+// console.log(readonlyObj.a) // 1;
+
+// //嵌套的对象属性也不能修改
+// // @ts-ignore
+// readonlyObj.c.d = 4
+// console.log(readonlyObj.c.d) // 3;
+
+//一些对象标准行为(特殊情况)需要进行排除
+import { reactive } from "./reactive";
 const obj = {
   a: 1,
   b: 2,
   c: {
     d: 3
+  },
+  [Symbol.toStringTag]: 'myObject',
+  items: [1, 2, 3],
+  [Symbol.iterator]: function () {
+    let index = 0
+    const items = this.items
+    return {
+      next: function () {
+        return index < items.length
+          ? { value: items[index++], done: false }
+          : { value: undefined, done: true }
+      }
+    }
   }
 };
-const readonlyObj = readonly(obj);
-//readonly应该触发依赖收集
 
-//对象的直接属性不能修改
-// @ts-ignore
-readonlyObj.a = 2
-console.log(readonlyObj.a) // 1;
+console.log(obj.toString()); // [object myObject]
 
-//嵌套的对象属性也不能修改
-// @ts-ignore
-readonlyObj.c.d = 4
-console.log(readonlyObj.c.d) // 3;
+for (const item of obj) {
+  console.log(item);
+}
+
+const state =reactive(obj)
+console.log((state as any).__proto__);
+console.log(state.toString());
+
+for (const item of state) {
+  console.log(item);
+}
