@@ -1,7 +1,7 @@
 import { enableTracking, pauseTracking, track, trigger } from './effect'
 import { extend, hasChanged, hasOwn, isArray, isIntegerKey, isObject, isSymbol } from './utils'
 import { ReactiveFlags, reactive, toRaw, targetMap, readonlyMap, reactiveMap, readonly } from './reactive'
-import { TrackOpTypes, TriggerOpTypes } from './operation'
+import { TrackOpTypes, TriggerOpTypes } from './operations'
 //用来表示对对象的"迭代依赖的标识"
 export const ITERATE_KEY = Symbol('')
 

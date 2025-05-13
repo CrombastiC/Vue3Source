@@ -12,10 +12,13 @@ export const isString = (val: unknown): val is string => {
 }
 //是否是一个函数
 export const isFunction = (val: unknown): val is Function => {
-  return typeof val === 'function'
+  return typeof val === 'function';
 }
 //是否是一个数组
-export const isArray = Array.isArray
+export function isArray<T>(arg: T | T[]): arg is T[] {
+  return Array.isArray(arg);
+}
+
 //是否是一个promise
 export const isPromise = <T = any>(val: unknown): val is Promise<T> => {
   return isObject(val) && isFunction(val.then) && isFunction(val.catch)
@@ -48,3 +51,7 @@ export const hasOwn = (
   val: object,  // 判断的对象
   key: string | symbol // 判断的key
 ): key is keyof typeof val => hasOwnProperty.call(val, key)
+
+
+// 空函数
+export const NOOP = () => {};
