@@ -33,3 +33,18 @@ export const isSymbol = (val: unknown): val is symbol => {
 
 //合并
 export const extend = Object.assign
+
+// 判断一个key是否是一个合法的整数类型的字符串
+export const isIntegerKey = (key: unknown) => { 
+  return isString(key) && // 检查key是否是字符串
+    key !== 'NaN' &&  // 确保key不是NaN字符串
+    key[0] !== '-' && // 确保key不是负数
+    '' + parseInt(key, 10) === key // 确保key是一个可以被转换为整数的合法字符串
+}
+
+const hasOwnProperty = Object.prototype.hasOwnProperty
+
+export const hasOwn = (
+  val: object,  // 判断的对象
+  key: string | symbol // 判断的key
+): key is keyof typeof val => hasOwnProperty.call(val, key)

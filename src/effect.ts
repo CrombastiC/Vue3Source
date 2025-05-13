@@ -1,4 +1,7 @@
+import { isArray } from "util";
 import { TrackOpTypes, TriggerOpTypes } from "./operation";
+import { ITERATE_KEY } from "./baseHandlers";
+import { isIntegerKey } from "./utils";
 
 export interface ReactiveEffect<T = any> {
   (): T
@@ -33,11 +36,13 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
   if (!shouldTrack || activeEffect == undefined) {
     return
   }
+
+   console.log(`依赖收集：【${type}】 ${String(key)}属性被读取了`);
   // 1. 根据target从buckets中获取对应的Map，保存的类型是key---effects的键值对
-  let depsMap = buckets.get(target);
+  let depsMap = targetMap.get(target);
   // 如果depsMap不存在，则初始化一个depsMap
   if (!depsMap) {
-    buckets.set(target, (depsMap = new Map()));
+    targetMap.set(target, (depsMap = new Map()));
   }
 
   // 2.根据key从depsMap中获取对应的Set，保存的是副作用函数
@@ -57,9 +62,78 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
 
 }
 
-export function trigger(target: object, type: TriggerOpTypes, key: unknown) {
+export function trigger(
+  target: object,
+  type: TriggerOpTypes,
+  key: unknown,
+  newValue?: unknown,
+  oldValue?: unknown
+) {
+  // 根据target从buckets中获取depsMap
+  const depsMap = targetMap.get(target);
+  // 如果depsMap不存在,则直接返回
+  if (!depsMap) {
+    return;
+  }
 
-  console.log(`%c触发更新；【${type}】${String(key)}`, 'color:#0f0');
+  // 执行effects中的副作用函数
+  // 为了避免无限循环,这里新建了一个Set对象
+  const effects = new Set<ReactiveEffect>();
+  const add = (effectsToAdd: Set<ReactiveEffect> | undefined) => {
+    if (effectsToAdd) {
+      effectsToAdd.forEach((effect) => {
+        if (effect !== activeEffect) {
+          effects.add(effect);
+        }
+      });
+    }
+  };
+
+  // 当属性key是length的时候，有可能会隐式影响数组的元素
+  if (key === "length" && isArray(target)) {
+    depsMap.forEach((dep, key) => {
+      // 当key是length,或者索引大于length时，需要触发副作用函数
+      if (key === "length" || key >= (newValue as number)) {
+        add(dep);
+      }
+    });
+  } else {
+    // 普通对象属性key
+    if (key !== void 0) {
+      console.log(type);
+      add(depsMap.get(key));
+    }
+
+    switch (type) {
+      case TriggerOpTypes.ADD:
+        // 如果不是数组，证明是需要迭代的对象
+        if (!isArray(target)) {
+          add(depsMap.get(ITERATE_KEY));
+        }
+        // key是一个整数类型的字符串，证明是数组，需要触发length属性
+        else if (isIntegerKey(key)) {
+          add(depsMap.get("length"));
+        }
+        break;
+      case TriggerOpTypes.DELETE:
+        // 如果不是数组，证明是需要迭代的对象
+        if (!isArray(target)) {
+          add(depsMap.get(ITERATE_KEY));
+        }
+        break;
+    }
+  }
+
+  effects.forEach((effect) => {
+    // 如果effect.options.schedular存在,则执行effect.options.schedular
+    // 并将副作用函数作为参数传递进去
+    if (effect.options.scheduler) {
+      effect.options.scheduler(effect);
+    } else {
+      // 否则直接执行副作用函数(之前的默认行为)
+      effect();
+    }
+  });
 }
 
 export function createReactiveEffect<T = any>(

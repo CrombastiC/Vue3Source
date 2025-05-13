@@ -1,5 +1,5 @@
 import { enableTracking, pauseTracking, track, trigger } from './effect'
-import { extend, hasChanged, isArray, isObject, isSymbol } from './utils'
+import { extend, hasChanged, hasOwn, isArray, isIntegerKey, isObject, isSymbol } from './utils'
 import { ReactiveFlags, reactive, toRaw, targetMap, readonlyMap, reactiveMap, readonly } from './reactive'
 import { TrackOpTypes, TriggerOpTypes } from './operation'
 //用来表示对对象的"迭代依赖的标识"
@@ -193,46 +193,29 @@ function createSetter(shallow = false) {
     value: unknown,
     receiver: object
   ): boolean {
-    //判断对象是否有这个属性
-    // const hasKey = target.hasOwnProperty(key)
-    const type = target.hasOwnProperty(key)
-      ? TriggerOpTypes.SET
-      : TriggerOpTypes.ADD
 
-    let oldValue = target[key]
-    const oldLen = Array.isArray(target) ? target.length : 0
-    // if (!hasKey) {
-    //   //如果没有这个属性，说明是新增的属性
+       let oldValue = target[key];
 
-    //   trigger(target, TriggerOpTypes.ADD, key)
-    // } else if (hasChanged(value, oldValue)) {
-    //   //如果有这个属性，说明是修改的属性
-    //   //如果值发生了变化，说明是修改的属性
-    //   trigger(target, TriggerOpTypes.SET, key)
-    // }
+    // 判断动作是ADD还是SET
+    // 如果目标是数组，并且key是一个有效的数组索引，需要判断key是否小于数组长度
+    // 如果目标是普通对象或者其他非数组对象，判断对象是否有这个key
+    // const hadKey = 如果是数组，并且key是一个有效的数组索引 ？
+    //    key 是否小于数组的长度(小于Set操作，大于Add操作)
+    //    : 不是数组直接判断是否有这个key属性(有Set操作，没有Add操作)
+    const hadKey =
+      isArray(target) && isIntegerKey(key)
+        ? Number(key) < target.length
+        : hasOwn(target, key);
 
     //设置对象的相应属性值
     const result = Reflect.set(target, key, value, receiver)
 
-    if (!result) {
-      return result
-    }
-
-    const newLen = Array.isArray(target) ? target.length : 0
-
-    if (hasChanged(value, oldValue) || type === TriggerOpTypes.ADD) {
-      trigger(target, type, key)
-      if (Array.isArray(target) && oldLen !== newLen) {
-        //如果是数组，并且长度发生了变化，说明是新增的属性
-        if (key !== 'length') {
-          trigger(target, TriggerOpTypes.ADD, 'length')
-        } else {
-          //当操作的key是length时，说明是删除了数组的元素。所以新的长度小于旧的长度
-          for (let i = newLen; i < oldLen; i++) {
-            //遍历旧的数组，触发删除操作
-            trigger(target, TriggerOpTypes.DELETE, i)
-          }
-        }
+      if (target === toRaw(receiver)) { 
+      if (!hadKey) {  // ADD操作
+        trigger(target, TriggerOpTypes.ADD, key, value);
+      }
+      else if (hasChanged(value, oldValue)) {  // SET操作
+        trigger(target, TriggerOpTypes.SET, key, value, oldValue);
       }
     }
     //返回设置结果
