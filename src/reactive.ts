@@ -82,7 +82,7 @@ export function readonly<T extends object>(target: T): DeepReadonly<T> {
   )
 }
 
-
+//浅层只读
 export function toRaw<T>(observed: T): T {
   return (observed as Target)[ReactiveFlags.RAW] || observed
 
