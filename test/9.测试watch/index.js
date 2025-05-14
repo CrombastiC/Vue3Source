@@ -601,20 +601,23 @@ const obj = {
   age: 18
 };
 
-
+const ref=ref(obj);
 const proxy = reactive(obj);
+watch(()=>ref.value.name,(newValue,oldValue)=>{
+  console.log('监听ref的name');
+  console.log('newValue',newValue);
+  console.log('oldValue',oldValue);
+},{immediate:true});
 
-watch(proxy, () => {
-  console.log("watch执行了");
-
-}
-);
-
-effect(() => {
-  layer1.innerHTML = proxy.name;
+effect(()=>{
+  layer1.innerHTML = ref.value.name;
+  layer2.innerHTML = ref.value.age;
 })
-
-btn1.addEventListener("click", () => {
-  proxy.name = "李四";
+btn1.addEventListener('click',()=>{
+  ref.value.name = '李四';
+}
+)
+btn2.addEventListener('click',()=>{
+  ref.value.age = 20;
 }
 );
